@@ -390,7 +390,12 @@ def logout():
 @app.route('/settings')
 @login_required
 def settings():
-    return render_template('settings.html')
+    instanceInfo = {
+        "totalUsers":db.session.query(User).count(),
+        "location":config['serverLocation'],
+        "serverName":config['serverName']
+    }
+    return render_template('settings.html', info=instanceInfo)
 
 @app.route('/export')
 @login_required
