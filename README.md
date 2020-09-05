@@ -120,7 +120,6 @@ I always recommend self-hosting, as you will be the only person with access to t
 
 ## Using Docker:
 ##### Building using the Dockerfile
-> (May not work on Windows)
 
 1. Install Docker:
     - `https://docs.docker.com/engine/install/`
@@ -144,7 +143,7 @@ I always recommend self-hosting, as you will be the only person with access to t
     - `https://docs.docker.com/engine/install/`
 
 2. Run the container:
-    - `docker run -p 5000:5000 sn0wed/yotter:alpha`
+    - `docker run -p 5000:5000 sn0wed/yotter:ghbuild`
     
 3. Go to "http://localhost:5000/" and enjoy.
 
