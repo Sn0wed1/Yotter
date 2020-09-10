@@ -7,6 +7,7 @@ from requests_futures.sessions import FuturesSession
 from werkzeug.datastructures import Headers
 from concurrent.futures import as_completed
 from werkzeug.utils import secure_filename
+from youtube_data import videos as ytvids
 from youtube_search import YoutubeSearch
 from werkzeug.urls import url_parse
 from youtube_dl import YoutubeDL
@@ -41,11 +42,17 @@ ALLOWED_EXTENSIONS = {'json', 'db'}
 #########################
 #### Twitter Logic ######
 #########################
+@app.before_request
+def before_request():
+    if current_user.is_authenticated:
+        current_user.set_last_seen()
+        db.session.commit()
+
 @app.route('/')
 @app.route('/index')
 @login_required
 def index():
-    return render_template('home.html')
+    return render_template('home.html', config=config)
 
 @app.route('/twitter')
 @login_required
@@ -63,7 +70,7 @@ def twitter():
     else:
         profilePic = posts[0].userProfilePic
     print("--- {} seconds fetching twitter feed---".format(time.time() - start_time))
-    return render_template('twitter.html', title='Yotter | Twitter', posts=posts, avatar=avatarPath, profilePic = profilePic, followedCount=followCount, form=form)
+    return render_template('twitter.html', title='Yotter | Twitter', posts=posts, avatar=avatarPath, profilePic = profilePic, followedCount=followCount, form=form, config=config)
 
 @app.route('/savePost/<url>', methods=['POST'])
 @login_required
@@ -90,7 +97,7 @@ def savePost(url):
 @login_required
 def saved():
     savedPosts = current_user.saved_posts().all()
-    return render_template('saved.html', title='Saved', savedPosts=savedPosts)
+    return render_template('saved.html', title='Saved', savedPosts=savedPosts, config=config)
 
 @app.route('/deleteSaved/<id>', methods=['POST'])
 @login_required
@@ -150,7 +157,7 @@ def following():
     form = EmptyForm()
     followCount = len(current_user.twitter_following_list())
     accounts = current_user.twitter_following_list()
-    return render_template('following.html', accounts = accounts, count = followCount, form = form)
+    return render_template('following.html', accounts = accounts, count = followCount, form = form, config=config)
 
 @app.route('/search', methods=['GET', 'POST'])
 @login_required
@@ -160,14 +167,15 @@ def search():
         user = form.username.data
         results = twitterUserSearch(user)
         if results:
-            return render_template('search.html', form = form, results = results)
+            return render_template('search.html', form = form, results = results, config=config)
         else:
             flash("User {} not found...".format(user))
             return redirect(request.referrer)
     else:
-        return render_template('search.html', form = form)
+        return render_template('search.html', form = form, config=config)
 
 @app.route('/u/<username>')
+@app.route('/<username>')
 @login_required
 def u(username):
     form = EmptyForm() 
@@ -182,7 +190,7 @@ def u(username):
     if not posts:
         user['profilePic'] = avatarPath
 
-    return render_template('user.html', posts=posts, user=user, form=form)
+    return render_template('user.html', posts=posts, user=user, form=form, config=config)
 
 #########################
 #### Youtube Logic ######
@@ -197,7 +205,7 @@ def youtube():
     if videos:
         videos.sort(key=lambda x: x.date, reverse=True)
     print("--- {} seconds fetching youtube feed---".format(time.time() - start_time))
-    return render_template('youtube.html', title="Yotter | Youtube", videos=videos, followCount=followCount)
+    return render_template('youtube.html', title="Yotter | Youtube", videos=videos, followCount=followCount, config=config)
 
 @app.route('/ytfollowing', methods=['GET', 'POST'])
 @login_required
@@ -206,7 +214,7 @@ def ytfollowing():
     channelList = current_user.youtube_following_list()
     channelCount = len(channelList)
     
-    return render_template('ytfollowing.html', form=form, channelList=channelList, channelCount=channelCount)
+    return render_template('ytfollowing.html', form=form, channelList=channelList, channelCount=channelCount, config=config)
 
 @app.route('/ytsearch', methods=['GET', 'POST'])
 @login_required
@@ -242,7 +250,7 @@ def ytsearch():
                 'thumbnail':'https:{}'.format(c['thumbnails'][0]),
                 'subCount':c['suscriberCountText'].split(" ")[0]
             })
-        return render_template('ytsearch.html', form=form, btform=button_form, channels=channels, videos=videos)
+        return render_template('ytsearch.html', form=form, btform=button_form, channels=channels, videos=videos, restricted=config['restrictPublicUsage'], config=config)
 
     else:
         return render_template('ytsearch.html', form=form)
@@ -278,18 +286,22 @@ def followYoutubeChannel(channelId):
 def ytunfollow(channelId):
     form = EmptyForm()
     if form.validate_on_submit():
-        r =  unfollowYoutubeChannel(channelId)
+        unfollowYoutubeChannel(channelId)
     return redirect(request.referrer)
 
 def unfollowYoutubeChannel(channelId):
     try:
         channel = youtubeFollow.query.filter_by(channelId=channelId).first()
+        name = channel.channelName
         db.session.delete(channel)
         db.session.commit()
-        flash("{} unfollowed!".format(channel.channelName))
+        channel = youtubeFollow.query.filter_by(channelId=channelId).first()
+        if channel:
+            db.session.delete(channel)
+            db.session.commit()
+        flash("{} unfollowed!".format(name))
     except:
         flash("There was an error unfollowing the user. Try again.")
-    return redirect(request.referrer)
 
 @app.route('/channel/<id>', methods=['GET'])
 @app.route('/user/<id>', methods=['GET'])
@@ -301,29 +313,28 @@ def channel(id):
     data = feedparser.parse(data.content)
 
     channelData = YoutubeSearch.channelInfo(id)
-    return render_template('channel.html', form=form, btform=button_form, channel=channelData[0], videos=channelData[1])
+    return render_template('channel.html', form=form, btform=button_form, channel=channelData[0], videos=channelData[1], restricted=config['restrictPublicUsage'], config=config)
 
 @app.route('/watch', methods=['GET'])
 @login_required
 def watch():
     id = request.args.get('v', None)
-    ydl = YoutubeDL()
-    data = ydl.extract_info(id, False)
-    if data['formats'][-1]['url'].find("manifest.googlevideo") > 0:
-        flash("Livestreams are not yet supported!")
-        return redirect(url_for('youtube'))
-
+    info = ytvids.get_video_info(id)
     video = {
-        'title':data['title'],
-        'description':Markup(markupString(data['description'])),
-        'viewCount':data['view_count'],
-        'author':data['uploader'],
-        'authorUrl':data['uploader_url'],
-        'channelId': data['uploader_id'],
+        'title':info['video']['title'],
+        'description':Markup(markupString(info['video']['description'])),
+        'viewCount':info['video']['views'],
+        'author':info['video']['author'],
+        'authorUrl':"/channel/{}".format(info['owner']['id']),
+        'channelId': info['owner']['id'],
         'id':id,
-        'averageRating': str((float(data['average_rating'])/5)*100)
+        'averageRating': str((float(info['video']['rating'])/5)*100),
+        'videoUrl': info['video']['url'],
+        'isLive': info['video']['isLive'],
+        'isUpcoming': info['video']['isUpcoming'],
+        'thumbnail': info['video']['thumbnail']
     }
-    return render_template("video.html", video=video)
+    return render_template("video.html", video=video, title='{}'.format(video['title']), config=config)
 
 def markupString(string):
     string = string.replace("\n\n", "<br><br>").replace("\n", "<br>")
@@ -331,22 +342,23 @@ def markupString(string):
     string = string.replace("https://youtube.com/", "")
     string = string.replace("https://www.youtube.com/", "")
     string = string.replace("https://twitter.com/", "/u/")
-    return string
+    return Markup(string)
 
 ## PROXY videos through Yotter server to the client.
-@app.route('/stream', methods=['GET', 'POST'])
+@app.route('/stream/<url>', methods=['GET', 'POST'])
 @login_required
-def stream():
+def stream(url):
     #This function proxies the video stream from GoogleVideo to the client.
-    id = request.args.get('v', None)
-    headers = Headers()    
-    if(id):
-        ydl = YoutubeDL()
-        data = ydl.extract_info("{id}".format(id=id), download=False)
-        req = requests.get(data['formats'][-1]['url'], stream = True)
+    url = url.replace('YotterSlash', '/')
+    headers = Headers()
+    if(url):
+        s = requests.Session()
+        s.verify = True
+        req = s.get(url, stream = True)
+        headers.add('Range', request.headers['Range'])
         headers.add('Accept-Ranges','bytes')
         headers.add('Content-Length', str(int(req.headers['Content-Length'])+1))
-        response = Response(req.iter_content(chunk_size=12*1024), mimetype=req.headers['Content-Type'], content_type=req.headers['Content-Type'], direct_passthrough=True, headers=headers)
+        response = Response(req.iter_content(chunk_size=10*1024), mimetype=req.headers['Content-Type'], content_type=req.headers['Content-Type'], direct_passthrough=True, headers=headers)
         #enable browser file caching with etags
         response.cache_control.public  = True
         response.cache_control.max_age = int(60000)
@@ -354,6 +366,12 @@ def stream():
     else:
         flash("Something went wrong loading the video... Try again.")
         return redirect(url_for('youtube'))
+
+def download_file(streamable):
+    with streamable as stream:
+        stream.raise_for_status()
+        for chunk in stream.iter_content(chunk_size=8192):
+            yield chunk
 
 #########################
 #### General Logic ######
@@ -373,7 +391,7 @@ def login():
         if not next_page or url_parse(next_page).netloc != '':
             next_page = url_for('index')
         return redirect(next_page)
-    return render_template('login.html', title='Sign In', form=form)
+    return render_template('login.html', title='Sign In', form=form, config=config)
 
 #Proxy images through server
 @app.route('/img/<url>', methods=['GET', 'POST'])
@@ -390,12 +408,24 @@ def logout():
 @app.route('/settings')
 @login_required
 def settings():
+    active = 0
+    users = db.session.query(User).all()
+    for u in users:
+        if u.last_seen == None:
+            u.set_last_seen()
+            db.session.commit()        
+        else:
+            t = datetime.datetime.utcnow() - u.last_seen
+            s = t.total_seconds()
+            m = s/60
+            if m < 10:
+                active = active+1
+
     instanceInfo = {
         "totalUsers":db.session.query(User).count(),
-        "location":config['serverLocation'],
-        "serverName":config['serverName']
+        "active":active,
     }
-    return render_template('settings.html', info=instanceInfo)
+    return render_template('settings.html', info=instanceInfo, config=config)
 
 @app.route('/export')
 @login_required
@@ -459,6 +489,16 @@ def importdata():
 
     return redirect(request.referrer)
 
+@app.route('/deleteme', methods=['GET', 'POST'])
+@login_required
+def deleteme():
+    user = User.query.filter_by(username=current_user.username).first()
+    db.session.delete(user)
+    db.session.commit()
+    logout_user()
+    return redirect(url_for('index'))
+
+
 def importYotterSubscriptions(file):
     filename = secure_filename(file.filename)
     data = json.load(file)
@@ -515,11 +555,12 @@ def register():
         flash('Congratulations, you are now a registered user!')
         return redirect(url_for('login'))
         
-    return render_template('register.html', title='Register', registrations=REGISTRATIONS, form=form)
+    return render_template('register.html', title='Register', registrations=REGISTRATIONS, form=form, config=config)
+        
 
 @app.route('/error/<errno>')
 def error(errno):
-    return render_template('{}.html'.format(str(errno)))
+    return render_template('{}.html'.format(str(errno)), config=config)
 
 def getTimeDiff(t):
     diff = datetime.datetime.now() - datetime.datetime(*t[:6])
@@ -635,7 +676,10 @@ def getFeed(urls):
                             if quote.find('a', attrs={'class':'still-image'}):
                                 newPost.replyAttachedImg = NITTERINSTANCE+quote.find('a', attrs={'class':'still-image'})['href'][1:]
                             
-                            newPost.replyingUser=quote.find('a',  attrs={'class':'username'}).text
+                            if quote.find('div', attrs={'class':'unavailable-quote'}):
+                                newPost.replyingUser="Unavailable"
+                            else:
+                                newPost.replyingUser=quote.find('a',  attrs={'class':'username'}).text
                             post.find('div', attrs={'class':'quote'}).decompose()
 
                         if post.find('div',  attrs={'class':'attachments'}):
@@ -657,7 +701,6 @@ def getPosts(account):
     if userFeed != []:
             for post in userFeed[:-1]:
                 date_time_str = post.find('span', attrs={'class':'tweet-date'}).find('a')['title'].replace(",","")
-                time = datetime.datetime.now() - datetime.datetime.strptime(date_time_str, '%d/%m/%Y %H:%M:%S')
 
                 if post.find('div', attrs={'class':'pinned'}):
                     if post.find('div', attrs={'class':'pinned'}).find('span', attrs={'icon-pin'}):
@@ -706,14 +749,35 @@ def getYoutubePosts(ids):
             resp = future.result()
             rssFeed=feedparser.parse(resp.content)
             for vid in rssFeed.entries:
-                time = datetime.datetime.now() - datetime.datetime(*vid.published_parsed[:6])
+                try:
+                    # Try to get time diff
+                    time = datetime.datetime.now() - datetime.datetime(*vid.published_parsed[:6])
+                except:
+                    # If youtube rss does not have parsed time, generate it. Else set time to 0.
+                    try:
+                        time = datetime.datetime.now() - datetime.datetime(datetime.datetime.strptime(vid.published, '%y-%m-%dT%H:%M:%S+00:00'))
+                    except:
+                        time = datetime.datetime.now() - datetime.datetime.now()
 
-                if time.days >=7:
+                if time.days >=6:
                     continue
                 
                 video = ytPost()
-                video.date = vid.published_parsed
-                video.timeStamp = getTimeDiff(vid.published_parsed)
+                try:
+                    video.date = vid.published_parsed
+                except:
+                    try:
+                        video.date = datetime.datetime.strptime(vid.published, '%y-%m-%dT%H:%M:%S+00:00').timetuple()
+                    except:
+                        video.date = datetime.datetime.utcnow().timetuple()
+                try:
+                    video.timeStamp = getTimeDiff(vid.published_parsed)
+                except:
+                    if time != 0:
+                        video.timeStamp = "{} days".format(str(time.days))
+                    else:
+                        video.timeStamp = "Unknown"
+
                 video.channelName = vid.author_detail.name
                 video.channelId = vid.yt_channelid
                 video.channelUrl = vid.author_detail.href
@@ -725,3 +789,4 @@ def getYoutubePosts(ids):
                 video.description = re.sub(r'^https?:\/\/.*[\r\n]*', '', video.description[0:120]+"...", flags=re.MULTILINE)
                 videos.append(video)
     return videos
+    

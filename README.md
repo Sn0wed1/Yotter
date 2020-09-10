@@ -1,6 +1,6 @@
 <p align="center"> <img width="700" src="app/static/img/banner.png"> </img></p> 
 <p align="center">
-   <a href="https://www.gnu.org/licenses/gpl-3.0"><img alt="License: GPL v3" src="https://img.shields.io/badge/License-GPLv3-blue.svg"></img></a>
+   <a href="https://www.gnu.org/licenses/gpl-3.0"><img alt="License: GPL v3" src="https://img.shields.io/badge/License-AGPLv3-blue.svg"></img></a>
    <a href="https://github.com/pluja/Yotter"><img alt="Development state" src="https://img.shields.io/badge/State-Beta-blue.svg"></img></a>
    <a href="https://github.com/pluja/Yotter/pulls"><img alt="Pull Requests Welcome" src="https://img.shields.io/badge/PRs-Welcome-green.svg"></img></a>
    <a href="https://github.com/pluja/Yotter/tree/master"><img alt="Formerly named Parasitter" src="https://img.shields.io/badge/Formerly-Parasitter-blue.svg"></img></a>
@@ -23,7 +23,7 @@ Yotter is possible thanks to several open-source projects that are listed on the
         * [Docker installation](#using-docker)
     * [Hosting on a server](#hosting-on-a-server)
     * [Update](#updating-to-newer-versions)
-    * [Configure server](configure-the-server)
+    * [Configure server](#configure-the-server)
 * [Contributing and contact](#contributing)
 * [Powered by](#powered-by)
 * [Donate](#donate)
@@ -77,11 +77,15 @@ I always recommend self-hosting, as you will be the only person with access to t
 # Public Instances
 | name |server location|registrations?|
 | ------------ | ------------ | ------------ |
-| -  |Germany|Open|
+| https://yotter.xyz  |Germany| Limited (30 users)|
 
 # Self hosting
 
+If you want to set up a public server you should follow the instructions [HERE](#hosting-on-a-server). The following instructions are for personal use only.
+
 ## Local
+
+You can run Yotter locally on your machine for personal use. You should use a VPN in order to cloak your IP.
 
 ##### IMPORTANT: Connections from the server to googlevideo will be made to stream the videos. It is recommended to use a VPN to preserve your privacy. Understand that the best way of using Yotter is [running on a remote server](#hosting-on-a-server).
 
@@ -119,6 +123,9 @@ I always recommend self-hosting, as you will be the only person with access to t
 9. Go to "http://localhost:5000/" and enjoy.
 
 ## Using Docker:
+
+Note: Not for a production server.
+
 ##### Building using the Dockerfile
 
 1. Install Docker:
@@ -147,8 +154,9 @@ I always recommend self-hosting, as you will be the only person with access to t
     
 3. Go to "http://localhost:5000/" and enjoy.
 
-## Hosting on a server:
+# Hosting on a server:
 
+If you want to set up a Yotter public instance, follow this instructions.
 #### [VISIT THIS FILE FOR INSTRUCTIONS](https://github.com/pluja/Yotter/blob/dev-indep/SELF-HOSTING.md)
 
 ## Updating to newer versions:
@@ -179,6 +187,7 @@ Currently available config is:
 * **nitterInstance**: Nitter instance that will be used when fetching Twitter content. Format must be `https://<NitterInstance.tld>/`
 * **maxInstanceUsers**: Max users on the instance. When set to `0` it closes registrations.
 * **location**: Location of the server.
+* **restrictPublicUsage**: When set to `false` the instance allows non-registered users to use some routes (i.e /watch?v=..., /ytsearch, /channel...). See [this section](https://github.com/pluja/Yotter/blob/dev-indep/SELF-HOSTING.md#removing-log-in-restrictions)
 
 # Contributing
 Contributors are always welcome. You can help in many ways: Coding, organizing, designing, [donating](#donate), maintaining... You choose what you want to help with!

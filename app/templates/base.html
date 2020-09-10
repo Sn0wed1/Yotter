@@ -16,6 +16,22 @@
         <link rel="stylesheet"href= "{{ url_for('static',filename='semantic/semantic.min.css') }}">
     </head>
     <body>
+        {% if config.maintenance_mode %}
+            <div class="ui info message">
+                <div class="header">
+                    Server under maintenance.
+                </div>
+            </div>
+        {% endif %}
+        {% if config.show_admin_message %}
+            <div class="ui warning message">
+                <div class="header">
+                    {{config.admin_message_title}}
+                </div>
+                    {{config.admin_message}}
+            </div>
+        {% endif %}
+        
         <div class="ui icon menu overflow-auto">
             <a href="{{ url_for('index') }}"><div class="item">
                 <img alt="Yotter simple logo" src="{{ url_for('static',filename='img/logo_simple.png') }}">

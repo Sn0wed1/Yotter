@@ -9,6 +9,29 @@
 - Play tweet videos from Parasitter.
 - Create following lists.
 
+## [0.2.4] - 2020.09.07
+### Changed
+- [x] Remove non implemented settings from settings page.
+- [x] Changed video streaming chunk size.
+- [x] Video streaming now has a smaller load for the server.
+- [x] Video streaming is (a bit) more efficient - YoutubeDL moved on /watch instead.
+- [x] Settings page improved.
+- [x] Default DB to .env or environment DATABASE_URI and fallback to app.db.
+
+### Added
+- [x] Add instance info on settings page.
+- [x] Documentation: Contributing section.
+- [x] Option to delete an account.
+- [x] Show video title on browser tab title on `/watch`.
+- [x] Ability for admins to allow non-registered users to use the service.
+- [x] Added last_seen - See #35
+- [x] See last 40 minutes active users on settings.
+- [x] Video streaming headers - #27
+
+### Fixed
+- [x] Video descriptions overflowing the description box.
+- [x] Twitter: mentioned users on feed lead to broken links.
+
 ## [0.2.3] - 2020-09-04
 ### Added
 - [x] Youtube: Proxy all images through Yotter.
